@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>正文编辑功能验证</title><link rel="stylesheet" href="../style.css?v=body-editor-20261025"></head><body><main style="max-width:850px;margin:30px auto;padding:20px"><h1>正文编辑功能验证</h1><p>仅使用本页的内存样例，不读取账号、不连接云端、不写入真实书库。</p><label class="check-row"><input type="checkbox" id="conflict">模拟另一台设备修改后的保存冲突</label><button id="open" class="primary">打开编辑器</button><pre id="result" style="white-space:pre-wrap"></pre></main><dialog id="editor"></dialog><script type="module">
+import {openChapterEditor} from '../chapter-editor.js';
+let work={id:'example',title:'正文编辑示例',author:'测试作者',verified:true,_rev:1,original:{path:'example/original'},chapters:[{title:'第一章',text:'第一章的原始正文。'},{title:'第二章',text:'第二章的原始正文。'}]};
+const result=document.querySelector('#result');function display(){result.textContent=JSON.stringify({revision:work._rev,verified:work.verified,chapters:work.chapters},null,2)}display();
+document.querySelector('#open').onclick=()=>openChapterEditor({work,modal:document.querySelector('#editor'),save:async copy=>{if(document.querySelector('#conflict').checked)throw new Error('作品已在另一台设备修改，请刷新书库后重试，避免覆盖。');copy._rev=work._rev+1},onSaved:copy=>{work=copy;display()}});
+</script></body></html>
