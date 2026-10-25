@@ -21,7 +21,7 @@ jobs:
       - name: Assemble static files only
         run: |
           mkdir public
-          cp index.html app.js importer.js store.js style.css icon.svg public/
+          cp index.html app.js importer.js store.js config.js style.css icon.svg public/
           cp -r vendor public/
           touch public/.nojekyll
       - uses: actions/configure-pages@v5

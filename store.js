@@ -1,5 +1,6 @@
+import { defaultConnection } from './config.js';
 const CFG_KEY='cangye.connection.v1',SESSION_KEY='cangye.session.v1';
-export const connection=()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||'null')}catch{return null}};
+export const connection=()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||'null')||defaultConnection}catch{return defaultConnection}};
 export function configure(url,key){const u=new URL(url);if(u.protocol!=='https:'||!u.hostname.endsWith('.supabase.co'))throw new Error('请输入 https://项目编号.supabase.co 格式的项目地址。');if(!key.trim()||key.startsWith('sb_secret_'))throw new Error('请使用 publishable key 或 legacy anon key，不能使用 secret/service_role。');
   if(key.split('.').length===3){try{const p=JSON.parse(atob(key.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(p.role!=='anon')throw new Error('仅允许 anon key。')}catch{throw new Error('不是有效的 anon key；不要输入 service_role。')}}
   localStorage.setItem(CFG_KEY,JSON.stringify({url:u.origin,key:key.trim()}));}
