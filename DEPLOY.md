@@ -1,5 +1,7 @@
 # 免费部署：GitHub Pages + Supabase
 
+**当前 sooajen-create/cangye 已完成部署和 Supabase 初始化。正常使用无需再执行本文的建库脚本；重复执行会因表已存在而失败。**下文用于迁移到新项目或重新部署。当前站点的 `config.js` 仅含可公开的 Project URL 和 publishable key，访问权限由唯一主人、RLS 和私有文件桶控制。
+
 你需要自己的 GitHub 账号和 Supabase 免费项目。这里不要求购买域名、信用卡或付费 AI API；服务政策、注册要求和免费额度请以服务商当时界面为准。
 
 ## 1. 创建 GitHub 仓库并上传
