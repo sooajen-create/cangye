@@ -82,9 +82,19 @@ export async function parseEPUB(buffer,name){
 }
 export async function parseFile(file){if(file.size>MAX_FILE)throw new Error('单文件上限 20 MB。');const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='epub')return parseEPUB(await file.arrayBuffer(),file.name);
-  if(!['txt','html','htm'].includes(ext))throw new Error('支持 HTML、TXT、EPUB；整库备份请使用“恢复备份”。');
-  const buffer=await file.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buffer)}catch{text=new TextDecoder('gb18030').decode(buffer)}
-  const work=ext==='txt'?parseTXT(text,file.name):extractHTML(text);if(work.title==='导入的文章')work.title=file.name;return work;
+  if(['pdf','docx','odt'].includes(ext)){
+    const formats=await import('./document-imports.js');const buffer=await file.arrayBuffer();const data=ext==='pdf'?await formats.parsePDF(buffer,file.name):ext==='docx'?await formats.parseDOCX(buffer,file.name):await formats.parseODT(buffer,file.name);
+    if(data.text){const w=parseTXT(data.text,file.name);const {text,...meta}=data;return {...w,...meta}}return newWork(data);
+  }
+  if(!['txt','text','html','htm','xhtml','md','markdown','fb2'].includes(ext))throw new Error('支持 TXT、HTML/XHTML、EPUB、PDF（文字版）、DOCX、Markdown、ODT、FB2；旧 DOC、MOBI/AZW 和扫描图片请先转换。整库 ZIP 请使用“恢复备份”。');
+  const buffer=await file.arrayBuffer();const bytes=new Uint8Array(buffer);let text;
+  if(bytes[0]===0xff&&bytes[1]===0xfe)text=new TextDecoder('utf-16le').decode(buffer);
+  else if(bytes[0]===0xfe&&bytes[1]===0xff)text=new TextDecoder('utf-16be').decode(buffer);
+  else {const declared=ext==='fb2'?new TextDecoder('latin1').decode(bytes.slice(0,256)).match(/<\?xml[^>]*encoding=["']([^"']+)["']/i)?.[1]:null;
+    if(declared){try{text=new TextDecoder(declared).decode(buffer)}catch{throw new Error('FB2 使用不支持的文字编码：'+declared)}}
+    else try{text=new TextDecoder('utf-8',{fatal:true}).decode(buffer)}catch{text=new TextDecoder('gb18030').decode(buffer)}}
+  if(['md','markdown','fb2'].includes(ext)){const formats=await import('./document-imports.js');return newWork(ext==='fb2'?formats.parseFB2(text,file.name):formats.parseMarkdown(text,file.name))}
+  const work=['txt','text'].includes(ext)?parseTXT(text,file.name):extractHTML(text);if(work.title==='导入的文章')work.title=file.name;return work;
 }
 export function validateWork(w){
   if(!w||typeof w.title!=='string'||!Array.isArray(w.chapters)||!w.chapters.length)throw new Error('无效作品数据。');

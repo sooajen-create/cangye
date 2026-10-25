@@ -1,1 +1,1 @@
-{"name":"cangye-private-library","private":true,"type":"module","version":"1.0.0","scripts":{"check":"node --check app.js && node --check importer.js && node --check store.js","test":"node --test tests/*.test.mjs"}}
+{"name":"cangye-private-library","private":true,"type":"module","version":"1.1.0","scripts":{"check":"node --check app.js && node --check importer.js && node --check document-imports.js && node --check store.js && node --check config.js","test":"node --test tests/*.test.mjs"}}
