@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+const memory=new Map();globalThis.localStorage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,String(v)),removeItem:k=>memory.delete(k)};
+const db=await import('../store.js');
+const response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+test('connection rejects secrets and non-Supabase origins',()=>{
+  assert.throws(()=>db.configure('http://example.com','x'),/项目地址/);
+  assert.throws(()=>db.configure('https://abc.supabase.co','sb_secret_bad'),/不能使用/);
+  const payload=Buffer.from(JSON.stringify({role:'service_role'})).toString('base64url');
+  assert.throws(()=>db.configure('https://abc.supabase.co','header.'+payload+'.sig'),/service_role/);
+  db.configure('https://abc.supabase.co','sb_publishable_test');
+});
+test('login, owner rejection, pagination and version conflict avoid silent data loss',async()=>{
+  const calls=[];let owner=false,conflict=false;
+  globalThis.fetch=async(url,opt={})=>{calls.push([url,opt]);
+    if(url.includes('/auth/v1/token'))return response({access_token:'test-token',refresh_token:'refresh',expires_in:3600,user:{id:'owner-uuid',email:'owner@example.invalid'}});
+    assert.equal(opt.headers.Authorization,'Bearer test-token');
+    if(url.includes('cangye_is_owner'))return response(owner);
+    if(opt.method==='PATCH')return response(conflict?[]:[{revision:3}]);
+    if(url.includes('offset=0'))return response(Array.from({length:100},(_,i)=>({id:'id-'+i,data:{title:'作品',chapters:[{text:'正文'}]},revision:1,reading:{},original:null})));
+    if(url.includes('offset=100'))return response([{id:'last',data:{title:'结尾作品',chapters:[{text:'最后正文'}]},revision:2}]);
+    throw new Error('Unexpected endpoint '+url);
+  };
+  await db.login('owner@example.invalid','not-a-real-password');
+  await assert.rejects(()=>db.listWorks(),/不是.*主人/);owner=true;
+  const rows=await db.listWorks();assert.equal(rows.length,101);assert.equal(rows[100].chapters[0].text,'最后正文');
+  const w=rows[100];await db.saveWork(w);assert.equal(w._rev,3);
+  const patch=calls.findLast(([,o])=>o.method==='PATCH');assert.ok(patch[0].includes('revision=eq.2'));
+  conflict=true;await assert.rejects(()=>db.saveWork(w),/另一台设备修改/);assert.equal(w._rev,3);
+});
