@@ -2,6 +2,14 @@
 
 日期：2026-10-25
 
+## 新增格式更新
+
+已部署文字版 PDF、DOCX、Markdown、ODT、FB2 与 XHTML 导入。保留原件，PDF 按页生成目录，最多 300 页；扫描版不含 OCR，旧 DOC、MOBI/AZW 及加密文件需先转换。
+
+本次 11 项 Node 测试、12 项线上浏览器解析测试全部通过。验证了 DOCX 表格与元数据、ODT、FB2 嵌套章节、Markdown、两页 PDF、无文字 PDF 拒绝、坏文件拒绝以及原有 EPUB 解析。手机尺寸下文件输入包含所有新扩展名且无横向溢出。本次没有向真实书库加入测试作品。
+
+下列为初始部署时的核验记录；其中“未完成实测”的列表是当时状态，新增格式的自制样例验证以本节为准。
+
 - 网站：https://sooajen-create.github.io/cangye/
 - 仓库：https://github.com/sooajen-create/cangye
 - 前端：GitHub Pages，Actions 部署。
