@@ -21,7 +21,7 @@ jobs:
       - name: Assemble static files only
         run: |
           mkdir public
-          cp index.html app.js chapter-editor.js importer.js document-imports.js store.js config.js style.css icon.svg public/
+          cp index.html app.js cp.js chapter-editor.js importer.js document-imports.js store.js config.js style.css icon.svg public/
           cp -r vendor public/
           mkdir public/tests
           cp tests/browser.html tests/editor.html tests/pdf-fixture.js public/tests/
