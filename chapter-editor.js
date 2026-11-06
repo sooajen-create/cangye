@@ -1,6 +1,6 @@
 const MAX_TEXT=12*1024*1024;
 export function buildEditedWork(work,chapters){
-  if(!Array.isArray(chapters)||chapters.length!==work.chapters.length||!chapters.length)throw new Error('章节结构已改变，请重新打开编辑器。');
+  if(!Array.isArray(chapters)||!chapters.length||chapters.length>2000)throw new Error('章节结构无效，需保留 1 至 2000 章。');
   let size=0;
   const copy=chapters.map((c,i)=>{
     if(typeof c.title!=='string'||typeof c.text!=='string')throw new Error('章节格式无效。');
@@ -10,10 +10,16 @@ export function buildEditedWork(work,chapters){
     size+=c.text.length;return {title,text:c.text};
   });
   if(size>MAX_TEXT)throw new Error('整篇正文超过 12 MB，请缩减后保存。');
-  if(copy.every((c,i)=>c.title===work.chapters[i].title&&c.text===work.chapters[i].text))return null;
+  if(copy.length===work.chapters.length&&copy.every((c,i)=>c.title===work.chapters[i].title&&c.text===work.chapters[i].text))return null;
   return {...work,chapters:copy,verified:false};
 }
 export function draftAsText(title,chapters){return title+'\n\n'+chapters.map(c=>c.title+'\n\n'+c.text).join('\n\n');}
+export function splitChapter(chapter,position){
+  if(!Number.isInteger(position)||position<=0||position>=chapter.text.length)throw new Error('请把光标放在正文中间需要分章的位置。');
+  const before=chapter.text.slice(0,position),after=chapter.text.slice(position);
+  if(!before.trim()||!after.trim())throw new Error('拆分后的两章都需要有正文。');
+  return [{title:chapter.title,text:before},{title:chapter.title+'（续）',text:after}];
+}
 
 export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
   const original=work.chapters.map(c=>({...c}));
@@ -23,8 +29,10 @@ export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
     <p class="subtle muted">修改你的私人阅读副本，原始上传文件会保留。切换章节会保留草稿，点击保存后同步；保存失败不会清空编辑内容。</p>
     <form id="body-editor-form" class="stack">
       <label>选择章节<select id="body-editor-chapter" aria-label="选择章节"></select></label>
+      <div class="row wrap"><button type="button" id="chapter-add">＋ 新增章节</button><button type="button" id="chapter-up">↑ 上移</button><button type="button" id="chapter-down">↓ 下移</button></div>
       <label>章节标题<input id="body-editor-title" maxlength="300" required aria-label="章节标题"></label>
       <label>正文<textarea id="body-editor-text" rows="15" required spellcheck="false" aria-label="正文"></textarea></label>
+      <div><button type="button" id="chapter-split">从光标处拆分章节</button><p class="subtle muted">先点正文中的分章位置，再点拆分；后半段会移入新章节。新增章节插在当前章后，填写正文后再保存。</p></div>
       <div class="row between wrap"><small id="body-editor-count"></small><small id="body-editor-dirty" role="status"></small></div>
       <p class="notice">保存后会重新标记为“待核对”。图片、排版与原始附件不会被本次文字修改替换。</p>
       <p class="error" id="body-editor-error" role="alert"></p>
@@ -33,11 +41,16 @@ export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
   modal.classList.add('body-editor');
   modal.setAttribute('aria-labelledby','body-editor-heading');
   const find=s=>modal.querySelector(s),chooser=find('#body-editor-chapter'),title=find('#body-editor-title'),text=find('#body-editor-text'),error=find('#body-editor-error');
-  const dirty=()=>drafts.some((c,i)=>c.title!==original[i].title||c.text!==original[i].text);
+  const dirty=()=>drafts.length!==original.length||drafts.some((c,i)=>c.title!==original[i].title||c.text!==original[i].text);
   const status=()=>{find('#body-editor-count').textContent=`本章 ${text.value.length.toLocaleString('zh-CN')} 字符 · 共 ${drafts.length} 章`;find('#body-editor-dirty').textContent=dirty()?'有未保存的修改':'尚未修改';};
   function options(){chooser.replaceChildren(...drafts.map((c,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=`${i+1}. ${c.title||'未命名章节'}`;return option}));chooser.value=String(index)}
   function capture(){drafts[index]={title:title.value,text:text.value};status()}
-  function load(){title.value=drafts[index].title;text.value=drafts[index].text;status()}
+  function load(){title.value=drafts[index].title;text.value=drafts[index].text;find('#chapter-up').disabled=index===0;find('#chapter-down').disabled=index===drafts.length-1;status()}
+  function structure(action){capture();error.textContent='';try{action();options();load()}catch(e){error.textContent=e.message}}
+  find('#chapter-add').onclick=()=>structure(()=>{if(drafts.length>=2000)throw new Error('最多支持 2000 章。');drafts.splice(index+1,0,{title:`第 ${drafts.length+1} 章`,text:''});index++});
+  find('#chapter-split').onclick=()=>{const position=text.selectionStart;structure(()=>{if(drafts.length>=2000)throw new Error('最多支持 2000 章。');drafts.splice(index,1,...splitChapter(drafts[index],position));index++})};
+  function move(offset){structure(()=>{const target=index+offset;if(target<0||target>=drafts.length)return;[drafts[index],drafts[target]]=[drafts[target],drafts[index]];index=target})}
+  find('#chapter-up').onclick=()=>move(-1);find('#chapter-down').onclick=()=>move(1);
   function requestClose(){if(saving)return;if(dirty()&&!confirm('还有未保存的正文修改，是否放弃这些编辑并关闭？'))return;cleanup();modal.close()}
   function outside(e){if(e.target!==modal)return;const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){e.stopImmediatePropagation();requestClose()}}
   function cancel(e){e.preventDefault();requestClose()}
@@ -54,9 +67,9 @@ export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
     try{updated=buildEditedWork(work,drafts);if(!updated){find('#body-editor-dirty').textContent='没有需要保存的修改';return}}
     catch(e){error.textContent=e.message;return}
     saving=true;modal.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=true);find('#body-editor-save').textContent='正在保存…';
-    try{await save(updated);original.splice(0,original.length,...updated.chapters.map(c=>({...c})));cleanup();modal.close();onSaved(updated)}
+    try{await save(updated);original.splice(0,original.length,...updated.chapters.map(c=>({...c})));cleanup();modal.close();onSaved(updated,index)}
     catch(e){error.textContent=(e.message||'保存失败')+' 编辑稿已保留，可重试或先导出 TXT。'}
-    finally{saving=false;modal.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=false);find('#body-editor-save').textContent='保存正文'}
+    finally{saving=false;modal.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=false);find('#chapter-up').disabled=index===0;find('#chapter-down').disabled=index===drafts.length-1;find('#body-editor-save').textContent='保存正文'}
   };
   options();load();if(!modal.open)modal.showModal();
 }
