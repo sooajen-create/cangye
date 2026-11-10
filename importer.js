@@ -1,3 +1,4 @@
+import {epubResources,richFields,safeCSS,MAX_RICH} from './rich-epub.js?v=20261110';
 export const MAX_FILE = 20 * 1024 * 1024;
 export const MAX_TEXT = 12 * 1024 * 1024;
 export function platform(url='') {
@@ -71,14 +72,17 @@ export async function parseEPUB(buffer,name){
   const cdoc=new DOMParser().parseFromString(await container.async('string'),'application/xml');const opfPath=cdoc.querySelector('rootfile')?.getAttribute('full-path');
   const opf=zip.file(opfPath||'');if(!opf)throw new Error('无效 EPUB：缺少书籍目录。');
   const doc=new DOMParser().parseFromString(await opf.async('string'),'application/xml');const byId=new Map(Array.from(doc.querySelectorAll('manifest item')).map(x=>[x.getAttribute('id'),x.getAttribute('href')]));
-  const chapters=[];let textLength=0,imageCount=0;
+  const chapters=[],richStyles={},styleIds=new Map(),resources=epubResources(zip);let textLength=0,imageCount=0,richLength=0;
   for(const ref of doc.querySelectorAll('spine itemref')){if(ref.getAttribute('linear')==='no')continue;const href=byId.get(ref.getAttribute('idref'));if(!href)continue;const file=zip.file(resolveZip(opfPath,href));if(!file)throw new Error('EPUB 缺少章节文件：'+href);
     const html=new DOMParser().parseFromString(await file.async('string'),'text/html');imageCount+=html.querySelectorAll('img,image').length;const text=readableText(html.body);textLength+=text.length;if(textLength>MAX_TEXT)throw new Error('EPUB 正文超过 12 MB。');
-    if(text)chapters.push({title:html.querySelector('h1,h2,h3')?.textContent?.trim()||html.title||`第 ${chapters.length+1} 节`,text});
+    const rich=await resources(html,resolveZip(opfPath,href));
+    let styleKey=styleIds.get(rich.css);if(!styleKey){styleKey='s'+styleIds.size;styleIds.set(rich.css,styleKey);richStyles[styleKey]=rich.css;richLength+=rich.css.length}delete rich.css;
+    richLength+=rich.html.length+rich.bodyStyle.length;if(richLength>MAX_RICH)throw new Error('精排内容超过 12 MB，请压缩 EPUB 中的图片与字体后重试。');
+    if(text||rich.html.includes('<img'))chapters.push({title:html.querySelector('h1,h2,h3')?.textContent?.trim()||html.title||`第 ${chapters.length+1} 节`,text,...rich,styleKey});
   }
   if(!chapters.length)throw new Error('EPUB 中没有可读取的正文；不支持 DRM 加密文件。');
   const value=tag=>doc.getElementsByTagNameNS('*',tag)[0]?.textContent||'';
-  return newWork({title:value('title')||name,author:value('creator')||'未知作者',source:'EPUB',chapters,importNote:imageCount?'阅读器提取文字；图片保留在原始 EPUB，需使用电子书阅读器查看。':'已按 EPUB 阅读顺序提取，请核对章节。'});
+  return newWork({title:value('title')||name,author:value('creator')||'未知作者',source:'EPUB',chapters,richStyles,importNote:'已保留 EPUB 精排、内嵌位图与字体，可切换纯文字阅读。外链资源、脚本与交互不导入，竖排以横排适配；修改章节文字后该章切换为纯文字。请核对正文与排版。'});
 }
 export async function parseFile(file){if(file.size>MAX_FILE)throw new Error('单文件上限 20 MB。');const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='epub')return parseEPUB(await file.arrayBuffer(),file.name);
@@ -99,7 +103,10 @@ export async function parseFile(file){if(file.size>MAX_FILE)throw new Error('单
 export function validateWork(w){
   if(!w||typeof w.title!=='string'||!Array.isArray(w.chapters)||!w.chapters.length)throw new Error('无效作品数据。');
   if(w.chapters.length>3000)throw new Error('章节数量超过上限。');
-  let total=0;const chapters=w.chapters.map((c,i)=>{if(typeof c.text!=='string')throw new Error('章节正文格式错误。');total+=c.text.length;return {title:String(c.title||`第 ${i+1} 章`).slice(0,300),text:c.text}});
+  const richStyles=Object.fromEntries(Object.entries(w.richStyles||{}).slice(0,3000).filter(([k,v])=>/^s\d+$/.test(k)&&typeof v==='string').map(([k,v])=>[k,safeCSS(v)]));
+  let richTotal=Object.values(richStyles).reduce((n,s)=>n+s.length,0);
+  let total=0;const chapters=w.chapters.map((c,i)=>{if(typeof c.text!=='string')throw new Error('章节正文格式错误。');total+=c.text.length;const rich=richFields(c);richTotal+=JSON.stringify(rich).length;return {title:String(c.title||`第 ${i+1} 章`).slice(0,300),text:c.text,...rich}});
   if(total>MAX_TEXT)throw new Error('作品正文过大。');
-  return newWork({id:typeof w.id==='string'&&/^[\w-]{1,80}$/.test(w.id)?w.id:crypto.randomUUID(),title:w.title.slice(0,500),author:String(w.author||'未知作者').slice(0,300),cp:String(w.cp||'未分类').slice(0,200),folder:String(w.folder||'').slice(0,300),collection:String(w.collection||'').slice(0,200),tags:Array.isArray(w.tags)?w.tags.slice(0,100).map(x=>String(x).slice(0,100)):[],source:String(w.source||'备份'),url:String(w.url||''),verified:!!w.verified,createdAt:w.createdAt||new Date().toISOString(),chapters,importNote:String(w.importNote||'')});
+  if(richTotal>MAX_RICH)throw new Error('作品精排内容超过 12 MB。');
+  return newWork({id:typeof w.id==='string'&&/^[\w-]{1,80}$/.test(w.id)?w.id:crypto.randomUUID(),title:w.title.slice(0,500),author:String(w.author||'未知作者').slice(0,300),cp:String(w.cp||'未分类').slice(0,200),folder:String(w.folder||'').slice(0,300),collection:String(w.collection||'').slice(0,200),tags:Array.isArray(w.tags)?w.tags.slice(0,100).map(x=>String(x).slice(0,100)):[],source:String(w.source||'备份'),url:String(w.url||''),verified:!!w.verified,createdAt:w.createdAt||new Date().toISOString(),chapters,richStyles,importNote:String(w.importNote||'')});
 }

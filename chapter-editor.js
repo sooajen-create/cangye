@@ -6,8 +6,9 @@ export function buildEditedWork(work,chapters){
     if(typeof c.title!=='string'||typeof c.text!=='string')throw new Error('章节格式无效。');
     const title=c.title.trim();if(!title)throw new Error(`第 ${i+1} 章的标题不能为空。`);
     if(title.length>300)throw new Error(`第 ${i+1} 章的标题超过 300 字符。`);
-    if(!c.text.trim())throw new Error(`第 ${i+1} 章的正文不能为空。`);
-    size+=c.text.length;return {title,text:c.text};
+    const old=work.chapters.find(o=>o.title===title&&o.text===c.text&&o.html===c.html);
+    if(!c.text.trim()&&!(old?.html&&old.html.includes('<img')))throw new Error(`第 ${i+1} 章的正文不能为空。`);
+    size+=c.text.length;return old?{...old,title,text:c.text}:{title,text:c.text};
   });
   if(size>MAX_TEXT)throw new Error('整篇正文超过 12 MB，请缩减后保存。');
   if(copy.length===work.chapters.length&&copy.every((c,i)=>c.title===work.chapters[i].title&&c.text===work.chapters[i].text))return null;
@@ -26,12 +27,12 @@ export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
   const drafts=original.map(c=>({...c}));
   let index=Math.max(0,Math.min(initialChapter,drafts.length-1)),saving=false;
   modal.innerHTML=`<div class="row between"><h2 id="body-editor-heading">编辑正文</h2><button type="button" class="quiet" id="body-editor-close" aria-label="关闭正文编辑器">✕</button></div>
-    <p class="subtle muted">修改你的私人阅读副本，原始上传文件会保留。切换章节会保留草稿，点击保存后同步；保存失败不会清空编辑内容。</p>
+    <p class="subtle muted">修改你的私人阅读副本，原始上传文件会保留。切换章节会保留草稿，点击保存后同步；保存失败不会清空编辑内容。精排章节修改标题、文字或拆分后，该章改为纯文字；未修改的章节保留精排。</p>
     <form id="body-editor-form" class="stack">
       <label>选择章节<select id="body-editor-chapter" aria-label="选择章节"></select></label>
       <div class="row wrap"><button type="button" id="chapter-add">＋ 新增章节</button><button type="button" id="chapter-up">↑ 上移</button><button type="button" id="chapter-down">↓ 下移</button></div>
       <label>章节标题<input id="body-editor-title" maxlength="300" required aria-label="章节标题"></label>
-      <label>正文<textarea id="body-editor-text" rows="15" required spellcheck="false" aria-label="正文"></textarea></label>
+      <label>正文<textarea id="body-editor-text" rows="15" spellcheck="false" aria-label="正文"></textarea></label>
       <div><button type="button" id="chapter-split">从光标处拆分章节</button><p class="subtle muted">先点正文中的分章位置，再点拆分；后半段会移入新章节。新增章节插在当前章后，填写正文后再保存。</p></div>
       <div class="row between wrap"><small id="body-editor-count"></small><small id="body-editor-dirty" role="status"></small></div>
       <p class="notice">保存后会重新标记为“待核对”。图片、排版与原始附件不会被本次文字修改替换。</p>
@@ -44,7 +45,7 @@ export function openChapterEditor({work,initialChapter=0,modal,save,onSaved}){
   const dirty=()=>drafts.length!==original.length||drafts.some((c,i)=>c.title!==original[i].title||c.text!==original[i].text);
   const status=()=>{find('#body-editor-count').textContent=`本章 ${text.value.length.toLocaleString('zh-CN')} 字符 · 共 ${drafts.length} 章`;find('#body-editor-dirty').textContent=dirty()?'有未保存的修改':'尚未修改';};
   function options(){chooser.replaceChildren(...drafts.map((c,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=`${i+1}. ${c.title||'未命名章节'}`;return option}));chooser.value=String(index)}
-  function capture(){drafts[index]={title:title.value,text:text.value};status()}
+  function capture(){drafts[index]={...drafts[index],title:title.value,text:text.value};status()}
   function load(){title.value=drafts[index].title;text.value=drafts[index].text;find('#chapter-up').disabled=index===0;find('#chapter-down').disabled=index===drafts.length-1;status()}
   function structure(action){capture();error.textContent='';try{action();options();load()}catch(e){error.textContent=e.message}}
   find('#chapter-add').onclick=()=>structure(()=>{if(drafts.length>=2000)throw new Error('最多支持 2000 章。');drafts.splice(index+1,0,{title:`第 ${drafts.length+1} 章`,text:''});index++});

@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>藏页浏览器解析测试</title><body><h1>浏览器解析测试</h1><pre id="result">运行中…</pre><script src="../vendor/jszip.min.js"></script><script type="module">
-import {extractHTML,parseEPUB,parseFile} from '../importer.js?v=formats-20261025';
+import {extractHTML,parseEPUB,parseFile} from '../importer.js?v=rich-20261110';
 import {textPDF,emptyPDF} from './pdf-fixture.js';
 const results=[];const check=(v,m)=>{if(!v)throw new Error(m)};const test=async(name,fn)=>{try{await fn();results.push('PASS '+name)}catch(e){results.push('FAIL '+name+': '+e.message)}};
 await test('AO3 多章节提取、标题作者、末段保留',()=>{const w=extractHTML('<h2 class="title">测试作品</h2><a rel="author">测试作者</a><div id="chapters"><div class="chapter"><h3 class="title">第一章</h3><div class="userstuff">'+('第一章正文。'.repeat(20))+'</div></div><div class="chapter"><h3 class="title">第二章</h3><div class="userstuff"><p>第二章正文。</p><p>最后一段，完整保留。</p></div></div></div>','https://archiveofourown.org/works/123');check(w.chapters.length===2,'章节数错误');check(w.title==='测试作品'&&w.author==='测试作者','元数据错误');check(w.chapters[1].text.endsWith('最后一段，完整保留。'),'末段丢失')});

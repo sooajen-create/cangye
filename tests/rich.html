@@ -1,0 +1,23 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>书织 EPUB 精排兼容验证</title><link rel="stylesheet" href="../style.css"></head><body><main style="max-width:760px;margin:24px auto;padding:18px"><h1>书织精排阅读</h1><p>独立样书演示，不连接账号或真实书库。由书织的实际 EPUB 导出代码生成。</p><pre id="result" style="white-space:pre-wrap">正在验证…</pre><label>章节<select id="chapter"></select></label><button id="toggle">切换纯文字</button><section style="margin-top:20px"><iframe id="preview" title="精排样书" style="width:100%;border:0;min-height:180px"></iframe><pre id="plain" hidden style="white-space:pre-wrap"></pre></section></main><script src="../vendor/jszip.min.js"></script><script type="module">
+import {parseEPUB,validateWork} from '../importer.js?v=rich-20261110';
+import {sanitizeHTML,mountRichChapter,richDocument} from '../rich-epub.js?v=20261110';
+import {bookloomFixture} from './bookloom-fixture.js';
+const result=document.querySelector('#result'),check=(v,m)=>{if(!v)throw Error(m)},reports=[];
+try{
+ const zip=new JSZip();for(const [path,base64]of Object.entries(bookloomFixture))zip.file(path,base64,{base64:true});
+ const w=await parseEPUB(await zip.generateAsync({type:'arraybuffer'}),'Bookloom.epub');
+ check(w.chapters.length===4,'封面或章节丢失');check(w.chapters[0].html.includes('data:image/png'),'封面没有离线保存');
+ check(w.chapters[1].html.includes('chat-message is-self')&&w.chapters[1].html.includes('bubble-tail'),'聊天左右布局或气泡尾巴丢失');
+ check(w.chapters[2].html.includes('weibo-subthread')&&w.chapters[2].html.includes('forum-icon'),'楼中楼或 SVG 图标丢失');
+ check(w.chapters[3].html.includes('letter-paper')&&w.chapters[3].html.includes('data:image/png'),'信纸或插图丢失');
+ check(Object.keys(w.richStyles).length===1&&Object.values(w.richStyles)[0].includes('data:font/woff'),'字体嵌入或共享样式错误');
+ reports.push('PASS 书织 EPUB：封面、聊天、论坛楼中楼、信纸、插图、字体资源与共享样式');
+ const restored=validateWork(JSON.parse(JSON.stringify(w)));check(restored.chapters[2].html.includes('weibo-subthread'),'备份恢复丢失精排');check(restored.chapters[3].text.includes('最后一段，完整保留。'),'可搜索正文丢失');reports.push('PASS 私人副本及备份 JSON 往返保留精排和全文');
+ const unsafe='<div onclick="alert(1)"><script>window.hacked=1;<\/script><iframe src="https://evil.example"></iframe><a href="javascript:alert(1)">正文</a><img src="https://evil.example/i" onerror="alert(1)"><svg onload="alert(1)"><foreignObject><iframe src="https://evil.example"></iframe></foreignObject><path d="M0 0"/></svg></div>';
+ const safe=sanitizeHTML(unsafe);check(!/onclick|onerror|onload|<script|<iframe|javascript:|https:|foreignObject/i.test(safe),'危险标记未清理');check(safe.includes('正文')&&safe.includes('<path'),'清理丢失安全正文或图标');reports.push('PASS 脚本、事件、外链和嵌套页面清理；隔离阅读器禁止联网');
+ const frame=document.querySelector('#preview'),selector=document.querySelector('#chapter');let rich=true;
+ w.chapters.forEach((c,i)=>selector.add(new Option(c.title,i)));selector.value='1';
+ function show(){const c=w.chapters[+selector.value];frame.hidden=!rich;document.querySelector('#plain').hidden=rich;document.querySelector('#plain').textContent=c.text;mountRichChapter(frame,{...c,css:w.richStyles[c.styleKey]});document.querySelector('#toggle').textContent=rich?'切换纯文字':'查看精排版'}
+ selector.onchange=show;document.querySelector('#toggle').onclick=()=>{rich=!rich;show()};show();result.textContent=reports.join('\n');
+}catch(e){result.textContent=reports.join('\n')+'\nFAIL '+e.message;throw e}
+</script></body></html>
