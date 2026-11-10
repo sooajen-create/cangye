@@ -61,6 +61,20 @@ Deno.serve(async(req:Request)=>{
     while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>MAX_BYTES){await reader.cancel();return json({error:'网页超过 3 MB，请使用文件导入。'},413)}chunks.push(value)}
     const bytes=new Uint8Array(size);let at=0;for(const c of chunks){bytes.set(c,at);at+=c.length}
     const type=response.headers.get('content-type')||'';const encoding=type.match(/charset\s*=\s*([\w-]+)/i)?.[1]||'utf-8';let html;try{html=new TextDecoder(encoding).decode(bytes)}catch{html=new TextDecoder().decode(bytes)}
+    // Current AFF pages load their body through a same-site HTMX chapter fragment.
+    // Follow only the explicit, narrowly shaped public fragment URL in this page.
+    const fragment=aff?html.match(/\bhx-get\s*=\s*["'](\/htmx\/chapter\/\d+\/[A-Za-z0-9_-]{6,200})["']/i)?.[1]:undefined;
+    if(fragment){
+      if(!['asianfanfics.com','www.asianfanfics.com'].includes(url.hostname))return json({error:'章节正文入口的域名不受支持。'},422);
+      const bodyResponse=await fetch(new URL(fragment,url),{redirect:'manual',headers:{...siteHeaders,'HX-Request':'true','HX-Current-URL':url.href,Referer:url.href,...(ageCookie?{Cookie:ageCookie}:{})},signal:AbortSignal.timeout(18000)});
+      if(!bodyResponse.ok||!/html|xhtml/i.test(bodyResponse.headers.get('content-type')||'')){await bodyResponse.body?.cancel();return json({error:'原站章节正文未能加载，可能已更新或仍需登录。请稍后重新导入，或在原站保存 HTML。'},422)}
+      const bodyReader=bodyResponse.body?.getReader();if(!bodyReader)return json({error:'原站章节正文为空。'},422);
+      const bodyChunks:Uint8Array[]=[];let bodySize=0;
+      while(true){const {done,value}=await bodyReader.read();if(done)break;bodySize+=value.length;if(size+bodySize>MAX_BYTES){await bodyReader.cancel();return json({error:'网页及章节正文合计超过 3 MB，请使用文件导入。'},413)}bodyChunks.push(value)}
+      const bodyBytes=new Uint8Array(bodySize);let offset=0;for(const c of bodyChunks){bodyBytes.set(c,offset);offset+=c.length}
+      const bodyHTML=new TextDecoder().decode(bodyBytes);
+      html=html.includes('</body>')?html.replace('</body>',bodyHTML+'</body>'):html+bodyHTML;
+    }
     // HTML is returned as JSON text; client parses inert DOM and renders escaped text only.
     return json({html,url:url.href});
   }catch(error){return json({error:error instanceof Error&&/timeout|abort/i.test(error.message)?'原站请求超时，请稍后重试或上传文件。':'无法提取网页，请使用 HTML、TXT、EPUB 文件导入。'},422)}
