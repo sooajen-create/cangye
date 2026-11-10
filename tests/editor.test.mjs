@@ -7,6 +7,11 @@ test('Editing chapters preserves identity, original attachment, revision and met
   const updated=buildEditedWork(original,chapters);assert.deepEqual(original,before);assert.equal(updated.chapters[0].title,'新标题');assert.equal(updated.chapters[1].text,chapters[1].text);assert.equal(updated._rev,4);assert.deepEqual(updated.original,original.original);assert.equal(updated.verified,false);assert.deepEqual(updated.tags,['标签']);
 });
 test('Unchanged content does not trigger a database save',()=>{const w=make();assert.equal(buildEditedWork(w,structuredClone(w.chapters)),null)});
+test('Deleting either chapter saves only the survivor and never mutates the original',()=>{
+ const w=make(),before=structuredClone(w);
+ for(const survivor of w.chapters){const updated=buildEditedWork(w,[survivor]);assert.deepEqual(updated.chapters,[survivor]);assert.equal(updated.id,w.id);assert.equal(updated._rev,w._rev);assert.deepEqual(updated.original,w.original)}
+ assert.deepEqual(w,before);assert.throws(()=>buildEditedWork(w,[]),/需保留/);
+});
 test('Splitting preserves every character and rejects empty halves',()=>{
   const c={title:'第一章',text:'前半段。\n\n后半段。'};
   const split=splitChapter(c,6);assert.equal(split.map(x=>x.text).join(''),c.text);

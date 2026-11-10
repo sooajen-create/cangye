@@ -1,7 +1,7 @@
 import * as db from './store.js?v=aff-age-20261110';
 import {mountRichChapter} from './rich-epub.js?v=20261110b';
 import {cpValues,normalizeCP} from './cp.js';
-import {openChapterEditor} from './chapter-editor.js?v=rich-20261110b';
+import {openChapterEditor} from './chapter-editor.js?v=delete-20261110';
 import {platform,newWork,extractHTML,parseFile,parseTXT,validateWork,MAX_FILE} from './importer.js?v=aff-20261110';
 const $=s=>document.querySelector(s),app=$('#app'),modal=$('#modal');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
