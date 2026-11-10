@@ -25,9 +25,20 @@ Deno.serve(async(req:Request)=>{
     const slot=await fetch(project+'/rest/v1/rpc/cangye_take_import_slot',{method:'POST',headers,body:'{}',signal:AbortSignal.timeout(8000)});
     if(!slot.ok||!(await slot.json()))return json({error:'仅限书库主人使用，或已达限流（每分钟 12 次、每天 500 次）。稍后可重试失败项。'},429);
     const body=await req.text();if(body.length>4096)return json({error:'请求过长。'},413);
-    let url:URL;try{url=new URL(JSON.parse(body).url)}catch{return json({error:'链接格式无效。'},400)}
+    let url:URL,confirmAge=false;try{const input=JSON.parse(body);url=new URL(input.url);confirmAge=input.confirmAge===true}catch{return json({error:'链接格式无效。'},400)}
     if(!allowed(url))return json({error:'支持 AO3、LOFTER、微博、Asianfanfics 和 WordPress.com 博客的 HTTPS 原站链接；其他网站及短链接暂不支持。'},400);
     url.hash='';
+    const aff=['asianfanfics.com','www.asianfanfics.com'].includes(url.hostname);
+    const siteHeaders={'User-Agent':'CangyePrivateLibrary/1.0 (personal archival; no login bypass)','Accept':'text/html,application/xhtml+xml'};
+    let ageCookie='';
+    if(aff&&confirmAge){
+      // Submit the site's own age-confirmation action. No fabricated cookies or login sessions.
+      const confirmation=await fetch(new URL('/htmx/story/verify_age',url),{redirect:'manual',headers:{...siteHeaders,Referer:url.href},signal:AbortSignal.timeout(18000)});
+      if(confirmation.status>=400){await confirmation.body?.cancel();return json({error:'原站未接受年龄确认，请在原站确认后保存 HTML 导入。'},422)}
+      ageCookie=confirmation.headers.getSetCookie().map(c=>c.split(';')[0]).filter(c=>/^[!#$%&'*+.^_`|~\w-]+=[^\r\n]*$/.test(c)).join('; ');
+      await confirmation.body?.cancel();
+      if(!ageCookie)return json({error:'原站未返回年龄确认状态，请在原站确认后保存 HTML 导入。'},422);
+    }
     if(url.hostname.endsWith('archiveofourown.org')){
       const id=url.pathname.match(/^\/works\/(\d+)(?:\/|$)/)?.[1];
       if(!id)return json({error:'请使用 AO3 单篇作品链接，而不是作者、搜索或合集链接。'},400);
@@ -37,7 +48,8 @@ Deno.serve(async(req:Request)=>{
     let response:Response|undefined;
     for(let hop=0;hop<5;hop++){
       if(!allowed(url))return json({error:'原站重定向到不支持的地址，请改用文件导入。'},400);
-      response=await fetch(url,{redirect:'manual',headers:{'User-Agent':'CangyePrivateLibrary/1.0 (personal archival; no login bypass)','Accept':'text/html,application/xhtml+xml'},signal:AbortSignal.timeout(18000)});
+      const sendAgeCookie=aff&&['asianfanfics.com','www.asianfanfics.com'].includes(url.hostname)&&ageCookie;
+      response=await fetch(url,{redirect:'manual',headers:{...siteHeaders,...(sendAgeCookie?{Cookie:ageCookie}:{})},signal:AbortSignal.timeout(18000)});
       if(response.status>=300&&response.status<400){const location=response.headers.get('location');await response.body?.cancel();if(!location)return json({error:'原站跳转无效。'},422);url=new URL(location,url);response=undefined;continue}break;
     }
     if(!response)return json({error:'原站重定向次数过多。'},422);

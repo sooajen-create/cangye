@@ -42,6 +42,6 @@ export async function removeWork(w){if(localMode){await idb('works','readwrite',
   await request('/rest/v1/works?id=eq.'+encodeURIComponent(w.id),{method:'DELETE'});
 }
 let lastImport=0;
-export async function importLink(url){if(localMode)throw new Error('链接自动提取需要连接 Supabase 并部署 import-link 函数。本地模式支持文件导入与粘贴正文。');
+export async function importLink(url,{confirmAge=false}={}){if(localMode)throw new Error('链接自动提取需要连接 Supabase 并部署 import-link 函数。本地模式支持文件导入与粘贴正文。');
   const wait=Math.max(0,5200-(Date.now()-lastImport));if(wait)await new Promise(r=>setTimeout(r,wait));lastImport=Date.now();
-  return (await request('/functions/v1/import-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})})).json()}
+  return (await request('/functions/v1/import-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,confirmAge:confirmAge===true})})).json()}
