@@ -24,7 +24,7 @@ jobs:
           cp index.html app.js cp.js rich-epub.js chapter-editor.js importer.js document-imports.js store.js config.js style.css icon.svg public/
           cp -r vendor public/
           mkdir public/tests
-          cp tests/browser.html tests/editor.html tests/pdf-fixture.js tests/rich.html tests/bookloom-fixture.js public/tests/
+          cp tests/browser.html tests/editor.html tests/pdf-fixture.js tests/rich.html tests/link-check.html tests/bookloom-fixture.js public/tests/
           touch public/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
