@@ -3,7 +3,7 @@ const MAX_BYTES=3*1024*1024;
 function allowed(u:URL){
   if(u.protocol!=='https:'||u.username||u.password||(u.port&&u.port!=='443'))return false;
   const host=u.hostname.toLowerCase();
-  return ['archiveofourown.org','www.archiveofourown.org','lofter.com','www.lofter.com','weibo.com','www.weibo.com','weibo.cn','m.weibo.cn','asianfanfics.com','www.asianfanfics.com'].includes(host)||(/^[a-z0-9-]+\.lofter\.com$/.test(host));
+  return ['archiveofourown.org','www.archiveofourown.org','lofter.com','www.lofter.com','weibo.com','www.weibo.com','weibo.cn','m.weibo.cn','asianfanfics.com','www.asianfanfics.com'].includes(host)||(/^[a-z0-9-]+\.lofter\.com$/.test(host))||(/^[a-z0-9][a-z0-9-]*\.wordpress\.com$/.test(host));
 }
 Deno.serve(async(req:Request)=>{
   const origin=req.headers.get('Origin')||'';
@@ -26,7 +26,7 @@ Deno.serve(async(req:Request)=>{
     if(!slot.ok||!(await slot.json()))return json({error:'仅限书库主人使用，或已达限流（每分钟 12 次、每天 500 次）。稍后可重试失败项。'},429);
     const body=await req.text();if(body.length>4096)return json({error:'请求过长。'},413);
     let url:URL;try{url=new URL(JSON.parse(body).url)}catch{return json({error:'链接格式无效。'},400)}
-    if(!allowed(url))return json({error:'仅支持四个平台的 HTTPS 原站链接；不支持短链接。'},400);
+    if(!allowed(url))return json({error:'支持 AO3、LOFTER、微博、Asianfanfics 和 WordPress.com 博客的 HTTPS 原站链接；其他网站及短链接暂不支持。'},400);
     url.hash='';
     if(url.hostname.endsWith('archiveofourown.org')){
       const id=url.pathname.match(/^\/works\/(\d+)(?:\/|$)/)?.[1];

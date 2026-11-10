@@ -7,6 +7,7 @@ export function platform(url='') {
     if (h === 'lofter.com' || h.endsWith('.lofter.com')) return 'LOFTER';
     if (['weibo.com','www.weibo.com','m.weibo.cn','weibo.cn'].includes(h)) return '微博';
     if (h === 'asianfanfics.com' || h === 'www.asianfanfics.com') return 'Asianfanfics';
+    if (/^[a-z0-9][a-z0-9-]*\.wordpress\.com$/.test(h)) return 'WordPress';
   } catch {} return '';
 }
 export function newWork(data={}) {
@@ -35,7 +36,13 @@ export function extractHTML(html,url='') {
   if(!chapters.length){
     const selectors = source==='LOFTER'?['.post-content','.postbody','.m-detail .content','.txtcont','.text','article']:
       source==='微博'?['.WB_editor_iframe_new','.WB_text','.weibo-text','.main-content','article']:
-      source==='Asianfanfics'?['#storytext','#story-text','.story-content','.chapter-content','article']:['article','main','.content'];
+      source==='Asianfanfics'?['#storytext','#story-text','.story-content','.chapter-content','article']:
+      source==='WordPress'?['.entry-content','.wp-block-post-content']:['article','main','.content'];
+    if(source==='WordPress'){
+      const blocks=doc.querySelectorAll('.entry-content,.wp-block-post-content');
+      if(blocks.length!==1)throw new Error('请使用 WordPress 单篇文章链接；目录、搜索或首页无法可靠提取。');
+      doc.querySelectorAll('.sharedaddy,.wordads-ad-wrapper,.jp-relatedposts,.wpcnt,.wp-block-jetpack-related-posts,.wp-block-jetpack-sharing-buttons,.wp-block-post-comments-form').forEach(e=>e.remove());
+    }
     let root; for(const s of selectors){const e=doc.querySelector(s);if(e&&readableText(e).length>40){root=e;break}}
     // A generic fallback is suitable for manual HTML; remote unsupported layouts fail visibly.
     if(!root&&!url)root=doc.body;

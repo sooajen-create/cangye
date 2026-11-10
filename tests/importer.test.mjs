@@ -6,6 +6,8 @@ test('platform matching rejects lookalike hosts and unsupported shortlinks',()=>
   assert.equal(platform('https://author.lofter.com/post/a'),'LOFTER');
   assert.equal(platform('https://m.weibo.cn/status/123'),'微博');
   assert.equal(platform('https://www.asianfanfics.com/story/view/123'),'Asianfanfics');
+  assert.equal(platform('https://dogdaysareover480.wordpress.com/2020/12/17/story/'),'WordPress');
+  for(const u of ['https://wordpress.com.evil.test','https://evilwordpress.com','https://blog.wordpress.com.evil.test'])assert.equal(platform(u),'');
   for(const u of ['https://archiveofourown.org.evil.com/works/1','https://lofter.com.evil.com','https://evil-lofter.com','https://t.cn/example','invalid'])assert.equal(platform(u),'');
 });
 test('TXT chapters preserve complete text including the ending',()=>{
