@@ -24,9 +24,13 @@ export function readableText(node) {
 const meta=(doc,...names)=>{for(const name of names){const e=doc.querySelector(`meta[property="${name}"],meta[name="${name}"]`);if(e?.getAttribute('content'))return e.getAttribute('content')}return ''};
 export function extractHTML(html,url='') {
   const doc = new DOMParser().parseFromString(html,'text/html');
-  const source = platform(url);
-  const title=(doc.querySelector('h2.title')?.textContent || meta(doc,'og:title') || doc.querySelector('h1')?.textContent || doc.title || '导入的文章').trim();
-  const author=(doc.querySelector('a[rel="author"]')?.textContent || meta(doc,'author','article:author') || doc.querySelector('.author,.blogname,.username')?.textContent || '未知作者').trim();
+  const pageURL=url||doc.querySelector('link[rel="canonical"]')?.getAttribute('href')||meta(doc,'og:url');
+  const source = platform(pageURL);
+  if(source==='Asianfanfics'&&doc.querySelector('a[href*="/verify_age"],form[action*="/verify_age"]'))throw new Error('原站要求年龄确认，云端尚未取得正文。请本人在原站完成确认后保存 HTML，再上传该文件；浏览器的确认状态不会自动同步到云端。');
+  const affId=source==='Asianfanfics'?new URL(pageURL).pathname.match(/\/story\/view\/(\d+)/)?.[1]:'';
+  const affStory=affId?[...doc.querySelectorAll('a[href]')].find(a=>{try{const u=new URL(a.getAttribute('href'),pageURL);return platform(u.href)==='Asianfanfics'&&new RegExp('^/story/view/'+affId+'/[^/0-9][^/]*$').test(u.pathname)}catch{return false}})?.textContent:'';
+  const title=(affStory||doc.querySelector('h2.title')?.textContent || meta(doc,'og:title') || doc.querySelector('h1')?.textContent || doc.title || '导入的文章').trim();
+  const author=(doc.querySelector('a[rel="author"]')?.textContent || meta(doc,'author','article:author') || (source==='Asianfanfics'?doc.querySelector('a[href*="/profile/u/"]')?.textContent:'') || doc.querySelector('.author,.blogname,.username')?.textContent || '未知作者').trim();
   let chapters=[];
   if(source==='AO3'||doc.querySelector('#chapters .userstuff')) {
     const blocks=doc.querySelectorAll('#chapters .chapter');
@@ -36,7 +40,7 @@ export function extractHTML(html,url='') {
   if(!chapters.length){
     const selectors = source==='LOFTER'?['.post-content','.postbody','.m-detail .content','.txtcont','.text','article']:
       source==='微博'?['.WB_editor_iframe_new','.WB_text','.weibo-text','.main-content','article']:
-      source==='Asianfanfics'?['#storytext','#story-text','.story-content','.chapter-content','article']:
+      source==='Asianfanfics'?['#user-submitted-body','#storytext','#story-text','.story-content','.chapter-content']:
       source==='WordPress'?['.entry-content','.wp-block-post-content']:['article','main','.content'];
     if(source==='WordPress'){
       const blocks=doc.querySelectorAll('.entry-content,.wp-block-post-content');
@@ -45,14 +49,14 @@ export function extractHTML(html,url='') {
     }
     let root; for(const s of selectors){const e=doc.querySelector(s);if(e&&readableText(e).length>40){root=e;break}}
     // A generic fallback is suitable for manual HTML; remote unsupported layouts fail visibly.
-    if(!root&&!url)root=doc.body;
-    if(root)chapters=[{title:'正文',text:readableText(root)}];
+    if(!root&&!url&&!source)root=doc.body;
+    if(root)chapters=[{title:source==='Asianfanfics'?(doc.querySelector('h1')?.textContent.trim()||'正文'):'正文',text:readableText(root)}];
   }
   chapters=chapters.filter(c=>c.text.length>0);
   if(chapters.reduce((n,c)=>n+c.text.length,0)>MAX_TEXT)throw new Error('正文超过 12 MB，请拆分导入。');
   if(!chapters.length || (url && chapters.reduce((n,c)=>n+c.text.length,0)<80))throw new Error('未提取到足够正文，可能是登录页、折叠内容或页面结构不支持。请在原站打开全文后保存 HTML/TXT，或手动粘贴。');
-  const imageCount=doc.querySelectorAll('article img,.userstuff img,.post-content img,.WB_text img,#storytext img').length;
-  return newWork({title,author,url,source:source||'HTML',chapters,importNote:imageCount?`原页面包含约 ${imageCount} 张图片；本次仅提取文字，请另存图片或原始文件。`:'网页提取结果需核对末段及章节数。',chapterLinks:chapterLinks(doc,url)});
+  const imageCount=doc.querySelectorAll('article img,.userstuff img,.post-content img,.WB_text img,#storytext img,#user-submitted-body img').length;
+  return newWork({title,author,url:pageURL||'',source:source||'HTML',chapters,importNote:imageCount?`原页面包含约 ${imageCount} 张图片；本次仅提取文字，请另存图片或原始文件。`:'网页提取结果需核对末段及章节数。',chapterLinks:chapterLinks(doc,pageURL)});
 }
 function chapterLinks(doc,url){
   if(platform(url)!=='Asianfanfics')return [];
