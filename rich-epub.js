@@ -45,7 +45,7 @@ export function mountRichChapter(frame,chapter,appearance={}){
   frame.setAttribute('referrerpolicy','no-referrer');
   let observer;
   frame.onload=()=>{try{observer?.disconnect();const doc=frame.contentDocument;if(!doc)return;
-    const resize=()=>{frame.style.height=Math.max(180,doc.documentElement.scrollHeight,doc.body.scrollHeight)+'px'};
+    const resize=()=>{const style=doc.defaultView.getComputedStyle(doc.body);frame.style.height=Math.max(180,Math.ceil(doc.body.getBoundingClientRect().height)+(parseFloat(style.marginTop)||0)+(parseFloat(style.marginBottom)||0)+2)+'px'};
     resize();observer=new ResizeObserver(resize);observer.observe(doc.body);doc.fonts?.ready.then(resize);
     for(const img of doc.images)img.addEventListener('load',resize);
   }catch{}};

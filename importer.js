@@ -1,4 +1,4 @@
-import {epubResources,richFields,safeCSS,MAX_RICH} from './rich-epub.js?v=20261110';
+import {epubResources,richFields,safeCSS,MAX_RICH} from './rich-epub.js?v=20261110b';
 export const MAX_FILE = 20 * 1024 * 1024;
 export const MAX_TEXT = 12 * 1024 * 1024;
 export function platform(url='') {

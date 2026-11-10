@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>书织 EPUB 精排兼容验证</title><link rel="stylesheet" href="../style.css"></head><body><main style="max-width:760px;margin:24px auto;padding:18px"><h1>书织精排阅读</h1><p>独立样书演示，不连接账号或真实书库。由书织的实际 EPUB 导出代码生成。</p><pre id="result" style="white-space:pre-wrap">正在验证…</pre><label>章节<select id="chapter"></select></label><button id="toggle">切换纯文字</button><section style="margin-top:20px"><iframe id="preview" title="精排样书" style="width:100%;border:0;min-height:180px"></iframe><pre id="plain" hidden style="white-space:pre-wrap"></pre></section></main><script src="../vendor/jszip.min.js"></script><script type="module">
-import {parseEPUB,validateWork} from '../importer.js?v=rich-20261110';
-import {sanitizeHTML,mountRichChapter,richDocument} from '../rich-epub.js?v=20261110';
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>书织 EPUB 精排兼容验证</title><link rel="stylesheet" href="../style.css"></head><body><main style="max-width:760px;margin:24px auto;padding:18px"><h1>书织精排阅读</h1><p>独立样书演示，不连接账号或真实书库。由书织的实际 EPUB 导出代码生成。</p><pre id="result" style="white-space:pre-wrap">正在验证…</pre><label for="chapter">章节</label><select id="chapter"></select><button id="toggle">切换纯文字</button><section style="margin-top:20px"><iframe id="preview" title="精排样书" style="width:100%;border:0;min-height:180px"></iframe><pre id="plain" hidden style="white-space:pre-wrap"></pre></section></main><script src="../vendor/jszip.min.js"></script><script type="module">
+import {parseEPUB,validateWork} from '../importer.js?v=rich-20261110b';
+import {sanitizeHTML,mountRichChapter,richDocument} from '../rich-epub.js?v=20261110b';
 import {bookloomFixture} from './bookloom-fixture.js';
 const result=document.querySelector('#result'),check=(v,m)=>{if(!v)throw Error(m)},reports=[];
 try{
