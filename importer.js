@@ -33,9 +33,13 @@ export function extractHTML(html,url='') {
   const author=(doc.querySelector('a[rel="author"]')?.textContent || meta(doc,'author','article:author') || (source==='Asianfanfics'?doc.querySelector('a[href*="/profile/u/"]')?.textContent:'') || doc.querySelector('.author,.blogname,.username')?.textContent || '未知作者').trim();
   let chapters=[];
   if(source==='AO3'||doc.querySelector('#chapters .userstuff')) {
-    const blocks=doc.querySelectorAll('#chapters .chapter');
-    if(blocks.length) chapters=Array.from(blocks).map((e,i)=>({title:e.querySelector('h3.title')?.textContent?.trim()||`第 ${i+1} 章`,text:readableText(e.querySelector('.userstuff:not(.notes)')||e)}));
-    else {const e=doc.querySelector('#chapters .userstuff,.userstuff');if(e)chapters=[{title:'正文',text:readableText(e)}]}
+    const root=doc.querySelector('#chapters');
+    const bodies=e=>[...e.querySelectorAll('.userstuff')].filter(n=>!n.closest('.notes,.preface,.summary,.announcement,header,footer,nav')&&!n.parentElement?.closest('.userstuff'));
+    const blocks=root?[...root.querySelectorAll('.chapter')]:[];
+    if(blocks.length) chapters=blocks.map((e,i)=>({title:e.querySelector('h3.title')?.textContent?.trim()||`第 ${i+1} 章`,text:bodies(e).map(readableText).join('\n\n')}));
+    else if(root)chapters=bodies(root).map((e,i)=>({title:i?`第 ${i+1} 章`:'正文',text:readableText(e)}));
+    // Never substitute site banners, author notes or page chrome for missing AO3 prose.
+    if(!chapters.length||chapters.some(c=>!c.text.trim()))throw new Error('未取得 AO3 作品正文，已停止保存，避免把站点公告或作者备注当成小说。页面可能是公告、登录或验证页，也可能有章节未加载；请从原站下载 HTML 后上传，并核对章节与结尾。');
   }
   if(!chapters.length){
     const selectors = source==='LOFTER'?['.post-content','.postbody','.m-detail .content','.txtcont','.text','article']:
